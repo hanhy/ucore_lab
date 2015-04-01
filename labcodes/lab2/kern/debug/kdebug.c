@@ -293,7 +293,7 @@ read_eip(void) {
  * */
 void
 print_stackframe(void) {
-     /* LAB1 YOUR CODE : STEP 1 */
+     /* LAB1 2012011176 : STEP 1 */
      /* (1) call read_ebp() to get the value of ebp. the type is (uint32_t);
       * (2) call read_eip() to get the value of eip. the type is (uint32_t);
       * (3) from 0 .. STACKFRAME_DEPTH
@@ -305,5 +305,27 @@ print_stackframe(void) {
       *           NOTICE: the calling funciton's return addr eip  = ss:[ebp+4]
       *                   the calling funciton's ebp = ss:[ebp]
       */
+	uint32_t ebp, eip;//初始化两个变量，分别代表ebp和eip中的内容
+	ebp = read_ebp();
+	eip = read_eip();//获取两个变量的值
+	
+	int i, j;
+
+	for (i = 0; i < STACKFRAME_DEPTH && ebp != 0; i ++){
+		//一直到栈底，且ebp不为0的时候输出以下内容
+		uint32_t * args = (uint32_t*) ebp + 2;//函数的参数部分
+		cprintf("ebp:0x%08x eip:0x%08x args:", ebp, eip);//输出ebp和eip的值
+		for (j = 0; j < 4; j ++)//输出参数
+			 cprintf("0x%08x ", args[j]);
+		cprintf("\n");
+		print_debuginfo(eip - 1);
+		//输出调试信息，因为eip指向的是下一条指令的位置，所以减一
+		eip = ((uint32_t *)ebp)[1];
+		ebp = ((uint32_t *)ebp)[0];
+		//ebp存储的是一个指针指向栈顶部的幀的底部
+		//更新eip和ebp的值，分别存在*ebp的前两位
+	}
+
+
 }
 

@@ -390,11 +390,11 @@ si
 	    outb(0x1F4, (secno >> 8) & 0xFF);
 	    outb(0x1F5, (secno >> 16) & 0xFF);
 	    outb(0x1F6, ((secno >> 24) & 0xF) | 0xE0);
-	        // 上面四条指令联合制定了扇区号
-	        // 在这4个字节线联合构成的32位参数中
-	        //   29-31位强制设为1
-	        //   28位(=0)表示访问"Disk 0"
-	        //   0-27位是28位的偏移量
+	    // 上面四条指令联合制定了扇区号
+	    // 在这4个字节线联合构成的32位参数中
+	    //   29-31位强制设为1
+	    //   28位(=0)表示访问"Disk 0"
+	    //   0-27位是28位的偏移量
 	    outb(0x1F7, 0x20);                      // 0x20命令，读取扇区
 	
 	    waitdisk();
@@ -413,8 +413,7 @@ readseg简单包装了readsect，可以从设备读取任意长度的内容。
 	    va -= offset % SECTSIZE;
 	
 	    uint32_t secno = (offset / SECTSIZE) + 1; 
-	    // 加1因为0扇区被引导占用
-	    // ELF文件从1扇区开始
+	    // 加1因为0扇区被引导占用所以ELF文件从1扇区开始
 	
 	    for (; va < end_va; va += SECTSIZE, secno ++) {
 	        readsect((void *)va, secno);
@@ -424,8 +423,7 @@ readseg简单包装了readsect，可以从设备读取任意长度的内容。
 
 在bootmain函数中，
 ```
-	void
-	bootmain(void) {
+	void bootmain(void) {
 	    // 首先读取ELF的头部
 	    readseg((uintptr_t)ELFHDR, SECTSIZE * 8, 0);
 	
@@ -461,7 +459,20 @@ readseg简单包装了readsect，可以从设备读取任意长度的内容。
 
 ## [练习5] 
 实现函数调用堆栈跟踪函数 
+	   uint32_t ebp = read_ebp(), eip = read_eip();
 
+	    int i, j;
+	    for (i = 0; ebp != 0 && i < STACKFRAME_DEPTH; i ++) {
+		cprintf("ebp:0x%08x eip:0x%08x args:", ebp, eip);
+		uint32_t *args = (uint32_t *)ebp + 2;
+		for (j = 0; j < 4; j ++) {
+		    cprintf("0x%08x ", args[j]);
+		}
+		cprintf("\n");
+		print_debuginfo(eip - 1);
+		eip = ((uint32_t *)ebp)[1];
+		ebp = ((uint32_t *)ebp)[0];
+	    }	
 ss:ebp指向的堆栈位置储存着caller的ebp，以此为线索可以得到所有使用堆栈的函数ebp。
 ss:ebp+4指向caller调用时的eip，ss:ebp+8等是（可能的）参数。
 
