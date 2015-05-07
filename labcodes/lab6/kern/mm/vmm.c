@@ -434,7 +434,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     ret = -E_NO_MEM;
 
     pte_t *ptep=NULL;
-    /*LAB3 EXERCISE 1: YOUR CODE
+    /*LAB3 EXERCISE 1: 2012011276
     * Maybe you want help comment, BELOW comments can help you finish the code
     *
     * Some Useful MACROs and DEFINEs, you can use them in below implementation.
@@ -452,14 +452,14 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     *
     */
 #if 0
-    /*LAB3 EXERCISE 1: YOUR CODE*/
+    /*LAB3 EXERCISE 1: 2012011276*/
     ptep = ???              //(1) try to find a pte, if pte's PT(Page Table) isn't existed, then create a PT.
     if (*ptep == 0) {
                             //(2) if the phy addr isn't exist, then alloc a page & map the phy addr with logical addr
 
     }
     else {
-    /*LAB3 EXERCISE 2: YOUR CODE
+    /*LAB3 EXERCISE 2: 2012011276
     * Now we think this pte is a  swap entry, we should load data from disk to a page with phy addr,
     * and map the phy addr with logical addr, trigger swap manager to record the access situation of this page.
     *
@@ -493,6 +493,26 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         }
    }
 #endif
+   ptep = get_pte(mm->pgdir, addr, 1);//查找PTE，如果这个PTE的PT(page table)不存在就创建一个PT
+				      //参数1的意义是不存在就创建一个
+   if(ptep != NULL && *ptep == 0){//正确执行了do_pgfault函数而且物理地址存在
+    	//pgdir_alloc_page(mm->pgdir, addr, perm);
+	if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL)//增加了一个判定的过程
+            goto failed;
+    	//还没有分配物理页，那么调用pgdir_alloc_page函数分配页
+   }
+   else{
+	if(ptep == NULL)
+	    goto failed;//执行do_pgfault函数出错
+	if(!swap_init_ok)
+	    goto failed;
+	//进行页置换
+	struct Page *tempPage = NULL;
+	if(swap_in(mm, addr, &tempPage))
+	    goto failed;
+	page_insert(mm->pgdir, tempPage, addr, perm);//建立映射
+	swap_map_swappable(mm, addr, tempPage, 1);//新页设为swappable
+   }
    ret = 0;
 failed:
     return ret;
