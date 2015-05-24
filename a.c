@@ -90,7 +90,7 @@ static struct proc_struct *
 alloc_proc(void) {
     struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
     if (proc != NULL) {
-    //LAB4:EXERCISE1 2012011276
+    //LAB4:EXERCISE1 2012011278
     /*
      * below fields in proc_struct need to be initialized
      *       enum proc_state state;                      // Process state
@@ -106,13 +106,13 @@ alloc_proc(void) {
      *       uint32_t flags;                             // Process flag
      *       char name[PROC_NAME_LEN + 1];               // Process name
      */
-	//LAB5 2012011276 : (update LAB4 steps)
+     //LAB5 2012011278 : (update LAB4 steps)
     /*
-     * below fields(add in LAB5) in proc_struct need to be initialized	
+     * below fields(add in LAB5) in proc_struct need to be initialized
      *       uint32_t wait_state;                        // waiting state
      *       struct proc_struct *cptr, *yptr, *optr;     // relations between processes
 	 */
-	//LAB6 2012011276 : (update LAB5 steps)
+     //LAB6 2012011278 : (update LAB5 steps)
     /*
      * below fields(add in LAB6) in proc_struct need to be initialized
      *     struct run_queue *rq;                       // running queue contains Process
@@ -122,30 +122,34 @@ alloc_proc(void) {
      *     uint32_t lab6_stride;                       // FOR LAB6 ONLY: the current stride of the process
      *     uint32_t lab6_priority;                     // FOR LAB6 ONLY: the priority of process, set by lab6_set_priority(uint32_t)
      */
-	//LAB 8 2012011176 EXERCISE2
-		proc->state = PROC_UNINIT;
-		proc->pid = -1;
-		proc->runs = 0;
-		proc->kstack = 0;
-		proc->need_resched = 0;
-		proc->parent = NULL;
-		proc->mm = NULL;
-		memset(&(proc->context), 0, sizeof(struct context));
-		proc->tf = NULL;
-		proc->cr3 = boot_cr3;
-		proc->flags = 0;
-		memset(&(proc->name), 0, PROC_NAME_LEN);
-		//lab5 update
-		proc->wait_state = 0;
-		proc->cptr = proc->optr = proc->yptr = NULL;
-		proc->rq = NULL;
+     //LAB8:EXERCISE2 2012011278 HINT:need add some code to init fs in proc_struct, ...
+    	proc->state = PROC_UNINIT;
+    	proc->pid = -1;
+    	proc->runs = 0;
+    	proc->kstack = 0;
+    	proc->need_resched = 0;
+    	proc->parent = NULL;
+    	proc->mm = NULL;
+    	memset(&(proc->context),0,sizeof(struct context));
+    	//proc->context = 0;
+    	proc->tf = NULL;
+    	proc->cr3 = boot_cr3;
+    	proc->flags = 0;
+    	memset(&(proc->name),0,PROC_NAME_LEN);
+    	//cprintf("qw...%d\t%d\n",proc->name,&(proc->name));
+    	//proc->name = 0;
+        proc->wait_state = 0;
+        proc->cptr = NULL;
+        proc->optr = NULL;
+        proc->yptr = NULL;
+        proc->rq = NULL;
         proc->run_link.prev = proc->run_link.next = NULL;
         proc->time_slice = 0;
         proc->lab6_run_pool.left = proc->lab6_run_pool.right = proc->lab6_run_pool.parent = NULL;
         proc->lab6_stride = 0;
         proc->lab6_priority = 0;
-		proc->filesp = NULL;
-	}
+        proc->filesp = NULL;
+    }
     return proc;
 }
 
@@ -449,7 +453,8 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
         goto fork_out;
     }
     ret = -E_NO_MEM;
-    //LAB4:EXERCISE2 2012011276
+    //LAB4:EXERCISE2 2012011278
+    //LAB8:EXERCISE2 2012011278  HINT:how to copy the fs in parent's proc_struct?
     /*
      * Some Useful MACROs, Functions and DEFINEs, you can use them in below implementation.
      * MACROs or Functions:
@@ -474,56 +479,48 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     //    5. insert proc_struct into hash_list && proc_list
     //    6. call wakup_proc to make the new child process RUNNABLE
     //    7. set ret vaule using child proc's pid
-	/*proc = alloc_proc();
-	proc->parent = current;
-	setup_kstack(proc);
-	copy_mm(clone_flags, proc)
-	copy_thread(proc, stack, tf);*/
-	//LAB5 2012011276 : (update LAB4 steps)
+
+    //LAB5 2012011278 : (update LAB4 steps)
    /* Some Functions
-    *    set_links:  set the relation links of process.  ALSO SEE: remove_links:  lean the relation links of process 
+    *    set_links:  set the relation links of process.  ALSO SEE: remove_links:  lean the relation links of process
     *    -------------------
 	*    update step 1: set child proc's parent to current process, make sure current process's wait_state is 0
 	*    update step 5: insert proc_struct into hash_list && proc_list, set the relation links of process
     */
-	//    1. call alloc_proc to allocate a proc_struct
-	proc = alloc_proc();
-	if (proc == NULL)
-        goto fork_out;
+
+    proc = alloc_proc();  //1
+    if(proc == NULL)
+    	goto fork_out;
+
     proc->parent = current;
-	assert(current->wait_state == 0);//update 1
+    assert(current->wait_state == 0);
 
-	//    2. call setup_kstack to allocate a kernel stack for child process
-    if (setup_kstack(proc) != 0)
-        goto bad_fork_cleanup_proc;
-	
-	//    3. call copy_mm to dup OR share mm according clone_flag
-    if (copy_mm(clone_flags, proc) != 0)
-        goto bad_fork_cleanup_kstack;
-    
-	if (copy_files(clone_flags, proc) != 0)
-		goto bad_fork_cleanup_fs;
+    int kstackRes = setup_kstack(proc);  //2
+    if(kstackRes != 0)
+    	goto bad_fork_cleanup_proc;
 
-	//    4. call copy_thread to setup tf & context in proc_struct
-	copy_thread(proc, stack, tf);
-	
-	//    5. insert proc_struct into hash_list && proc_list
-	bool intr_flag;
-    local_intr_save(intr_flag);
+    int mmRes = copy_mm(clone_flags,proc);  //3
+    if(mmRes != 0)
+    	goto bad_fork_cleanup_kstack;
+
+    int fsRes = copy_files(clone_flags, proc);
+    if (fsRes != 0)
+    	goto bad_fork_cleanup_fs;
+
+    copy_thread(proc,stack,tf);  //4
+
+    bool intr_flag;
+    local_intr_save(intr_flag);//中断
     {
-        proc->pid = get_pid();
-        hash_proc(proc);
-        set_links(proc);
-		//cprintf("nr_process: %d\n", nr_process);
+		proc->pid = get_pid();
+		hash_proc(proc);
+		set_links(proc);
     }
-    local_intr_restore(intr_flag);
-	
-	//    6. call wakup_proc to make the new child process RUNNABLE
-    wakeup_proc(proc);
-	
-	//    7. set ret vaule using child proc's pid
-	//cprintf("pid: %d\n", pid);
-    ret = proc->pid;
+    local_intr_restore(intr_flag);//中断
+
+    wakeup_proc(proc);  //6
+
+    ret = proc->pid;  //7
 	
 fork_out:
     return ret;
@@ -595,10 +592,7 @@ do_exit(int error_code) {
     panic("do_exit will not return!! %d.\n", current->pid);
 }
 
-/* load_icode - load the content of binary program(ELF format) as the new content of current process
- * @binary:  the memory addr of the content of binary program
- * @size:  the size of the content of binary program
- */
+//load_icode_read is used by load_icode in LAB8
 static int
 load_icode_read(int fd, void *buf, size_t len, off_t offset) {
     int ret;
@@ -646,8 +640,8 @@ load_icode(int fd, int argc, char **kargv) {
     }
 
     int ret = -E_NO_MEM;
-    struct mm_struct *mm;
     //(1) create a new mm for current process
+    struct mm_struct *mm;
     if ((mm = mm_create()) == NULL) {
         goto bad_mm;
     }
@@ -655,7 +649,9 @@ load_icode(int fd, int argc, char **kargv) {
     if (setup_pgdir(mm) != 0) {
         goto bad_pgdir_cleanup_mm;
     }
-    //(3) copy TEXT/DATA section, build BSS parts in binary to memory space of process
+
+    //(3) copy TEXT/DATA/BSS parts in binary to memory space of process
+    //(3.1) read raw data content in file and resolve elfhdr
     struct Page *page;
 
     struct elfhdr __elf, *elf = &__elf;
@@ -686,7 +682,7 @@ load_icode(int fd, int argc, char **kargv) {
         if (ph->p_filesz == 0) {
             continue ;
         }
-    //(3.5) call mm_map fun to setup the new vma ( ph->p_va, ph->p_memsz)
+        //(3.3) call mm_map to build vma related to TEXT/DATA
         vm_flags = 0, perm = PTE_U;
         if (ph->p_flags & ELF_PF_X) vm_flags |= VM_EXEC;
         if (ph->p_flags & ELF_PF_W) vm_flags |= VM_WRITE;
@@ -699,11 +695,11 @@ load_icode(int fd, int argc, char **kargv) {
         size_t off, size;
         uintptr_t start = ph->p_va, end, la = ROUNDDOWN(start, PGSIZE);
 
+        //(3.4) callpgdir_alloc_page to allocate page for TEXT/DATA, read contents in file
+        //      and copy them into the new allocated pages
         ret = -E_NO_MEM;
 
-     //(3.6) alloc memory, and  copy the contents of every program section (from, from+end) to process's memory (la, la+end)
         end = ph->p_va + ph->p_filesz;
-     //(3.6.1) copy TEXT/DATA section of bianry program
         while (start < end) {
             if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL) {
                 ret = -E_NO_MEM;
@@ -719,8 +715,9 @@ load_icode(int fd, int argc, char **kargv) {
             start += size, offset += size;
         }
 
-      //(3.6.2) build BSS section of binary program
+        //(3.5) callpgdir_alloc_page to allocate pages for BSS, memset zero in these pages
         end = ph->p_va + ph->p_memsz;
+
         if (start < la) {
             /* ph->p_memsz == ph->p_filesz */
             if (start == end) {
@@ -747,8 +744,9 @@ load_icode(int fd, int argc, char **kargv) {
             start += size;
         }
     }
-	sysfile_close(fd);
-    //(4) build user stack memory
+    sysfile_close(fd);
+
+    //(4) call mm_map to setup user stack, and put parameters into user stack
     vm_flags = VM_READ | VM_WRITE | VM_STACK;
     if ((ret = mm_map(mm, USTACKTOP - USTACKSIZE, USTACKSIZE, vm_flags, NULL)) != 0) {
         goto bad_cleanup_mmap;
@@ -757,8 +755,8 @@ load_icode(int fd, int argc, char **kargv) {
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-2*PGSIZE , PTE_USER) != NULL);
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-3*PGSIZE , PTE_USER) != NULL);
     assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-4*PGSIZE , PTE_USER) != NULL);
-    
-    //(5) set current process's mm, sr3, and set CR3 reg = physical addr of Page Directory
+
+    //(5) setup current process's mm, cr3, reset pgidr (using lcr3 MARCO)
     mm_count_inc(mm);
     current->mm = mm;
     current->cr3 = PADDR(mm->pgdir);
@@ -786,7 +784,7 @@ load_icode(int fd, int argc, char **kargv) {
     //(7) setup trapframe for user environment
     struct trapframe *tf = current->tf;
     memset(tf, 0, sizeof(struct trapframe));
-    /* LAB5:EXERCISE1 2012011276
+    /* LAB5:EXERCISE1 2012011278
      * should set tf_cs,tf_ds,tf_es,tf_ss,tf_esp,tf_eip,tf_eflags
      * NOTICE: If we set trapframe correctly, then the user level process can return to USER MODE from kernel. So
      *          tf_cs should be USER_CS segment (see memlayout.h)
@@ -796,11 +794,12 @@ load_icode(int fd, int argc, char **kargv) {
      *          tf_eflags should be set to enable computer to produce Interrupt
      */
     tf->tf_cs = USER_CS;
-    tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+    tf->tf_ds=tf->tf_es=tf->tf_ss = USER_DS;
     tf->tf_esp = stacktop;
     tf->tf_eip = elf->e_entry;
-    tf->tf_eflags = FL_IF;//interupt flags
+    tf->tf_eflags = FL_IF;
     ret = 0;
+//(8) if up steps failed, you should cleanup the env.
 out:
     return ret;
 bad_cleanup_mmap:

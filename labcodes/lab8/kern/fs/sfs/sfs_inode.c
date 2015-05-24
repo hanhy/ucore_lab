@@ -599,6 +599,68 @@ sfs_io_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, void *buf, off_t offset
      * (3) If end position isn't aligned with the last block, Rd/Wr some content from begin to the (endpos % SFS_BLKSIZE) of the last block
 	 *       NOTICE: useful function: sfs_bmap_load_nolock, sfs_buf_op	
 	*/
+    //1
+	//read
+    blkoff = offset % SFS_BLKSIZE;
+	//not in the beginning of one block
+    if (blkoff != 0){
+    	//set the size 
+		if(nblks != 0)
+			size = SFS_BLKSIZE - blkoff;
+		else
+			size = endpos - offset;
+        //get the disk num
+        ret = sfs_bmap_load_nolock(sfs, sin, blkno, &ino);
+        if (ret != 0)
+            goto out;
+        //real reading 
+        ret = sfs_buf_op(sfs, buf, size, ino, blkoff);
+        if (ret != 0)
+            goto out;
+        //upodate alen
+        alen += size;
+        //when the end get to the out
+        if (nblks == 0)
+            goto out;
+        //ipdate buf、blkno、nblks
+        buf += size;
+        blkno ++;
+        nblks --;
+    }
+
+    //2
+    size = SFS_BLKSIZE;
+    while(nblks != 0){
+    	//get disk num
+    	ret = sfs_bmap_load_nolock(sfs, sin, blkno, &ino);
+    	if (ret != 0)
+    		goto out;
+    	//real reading
+    	ret = sfs_buf_op(sfs, buf, size, ino, blkoff);
+    	if (ret != 0)
+    		goto out;
+    	//uodate alen、buf、blkno、nblks
+    	alen += size;
+    	buf += size;
+    	blkno ++;
+    	nblks --;
+    }
+
+    //3
+    //get size 
+    size = endpos % SFS_BLKSIZE;
+    if(size != 0){
+    	//get disk num
+    	ret = sfs_bmap_load_nolock(sfs, sin, blkno, &ino);
+    	if (ret != 0)
+    		goto out;
+    	//real reading
+    	ret = sfs_buf_op(sfs, buf, size, ino, blkoff);
+    	if (ret != 0)
+    		goto out;
+    	//uodate alen
+    	alen += size;
+    }
 out:
     *alenp = alen;
     if (offset + alen > sin->din->size) {
